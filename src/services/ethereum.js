@@ -1,4 +1,5 @@
 import { Web3 } from "web3"
+import { keccak256, toUtf8Bytes, ethers, concat, AbiCoder, recoverAddress, hexlify, toBeHex } from "ethers"
 import { bytesToHex } from '@ethereumjs/util';
 import { FeeMarketEIP1559Transaction } from '@ethereumjs/tx';
 import { deriveChildPublicKey, najPublicKeyStrToUncompressedHexPoint, uncompressedHexPointToEvmAddress } from '../services/kdf';
@@ -70,6 +71,81 @@ export class Ethereum {
     sessionStorage.setItem('transaction', transaction.serialize());
 
     return { transaction, payload };
+  }
+
+  createEip712Payload(domain, types, message) {
+    const domainSeparator = this.getDomainSeparator(domain);
+    console.log("> ### Domain Separator:", domainSeparator);
+    const structHash = this.getStructHash(message);
+    console.log("> ### structHash:", structHash);
+    console.log("> ### aggregator: :", hexlify(toUtf8Bytes(message.aggregator)));
+    const digest = keccak256(
+      concat(["0x1901", domainSeparator, structHash])
+    );
+    console.log("> ### Digest:", digest);
+    const toSignMessage = ethers.getBytes(digest);
+    console.log("> ### To sign message:", toSignMessage);
+    return { digest, toSignMessage };
+  }
+
+  getStructHash(data) {
+    // { name: "aggregator", type: "string" },
+    // { name: "reportersFee", type: "uint256" },
+    // { name: "publishFee", type: "uint256" },
+    // { name: "rewardAddress", type: "address" },
+    // { name: "version", type: "uint256" },
+    const typeHash = keccak256(
+      toUtf8Bytes(
+        "AggregatorConfig(string aggregator,address rewardAddress,uint256 reportersFee,uint256 publishFee,uint256 version)"
+      )
+    );
+
+    console.log("> ### struct type Hash", typeHash);
+
+    const structHash = new AbiCoder().encode(
+      ["bytes32", "bytes32", "address", "uint256", "uint256", "uint256"],
+      [
+        typeHash,
+        keccak256(toUtf8Bytes(data.aggregator)),
+        data.rewardAddress,
+        data.reportersFee,
+        data.publishFee,
+        data.version
+      ]
+    );
+
+    return keccak256(structHash);
+  }
+
+  getDomainSeparator(domain) {
+    const typeHash = keccak256(
+      toUtf8Bytes(
+        "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+      )
+    );
+    console.log("### getDomainSeparator typeHash", typeHash);
+
+    const domainHash = new AbiCoder().encode(
+      ["bytes32", "bytes32", "bytes32", "uint256", "address"],
+      [
+        typeHash,
+        keccak256(toUtf8Bytes(domain.name)),
+        keccak256(toUtf8Bytes(domain.version)),
+        domain.chainId,
+        domain.verifyingContract
+      ]
+    );
+
+    console.log("### getDomainSeparator domainHash", domainHash);
+
+    return keccak256(domainHash);
+  }
+
+  verifySignature(digest, r, s, v) {
+    const recoveredAddress = recoverAddress(digest, { r, s, v });
+    console.log("### signature: ", concat([r, s, toBeHex(v, 1)]));
+    console.log("### Recovered Address", recoveredAddress);
+    return recoveredAddress;
   }
 
   async requestSignatureToMPC(wallet, contractId, path, ethPayload) {

@@ -61,30 +61,9 @@ export const FunctionCallForm = forwardRef(({ props: { Eth, senderAddress, loadi
 
   useImperativeHandle(ref, () => ({
     async createPayload() {
-      const eip712Domain = {
-        "name": "XAPI",
-        "version": "1",
-        "chainId": "421614",
-        "verifyingContract": "0x9F33a4809aA708d7a399fedBa514e0A0d15EfA85"
-      };
-      const types = {
-        "AggregatorConfig": [
-          { name: "aggregator", type: "string" },
-          { name: "rewardAddress", type: "address" },
-          { name: "reportersFee", type: "uint256" },
-          { name: "publishFee", type: "uint256" },
-          { name: "version", type: "uint256" },
-        ]
-      }
-      const message = {
-        "aggregator": "test.aggregator.testnet",
-        "rewardAddress": "0x9F33a4809aA708d7a399fedBa514e0A0d15EfA85",
-        "reportersFee": BigInt(100),
-        "publishFee": BigInt(200),
-        "version": "1234567",
-      }
-      const toSignMessage = await Eth.createEip712Payload(eip712Domain, types, message);
-      return toSignMessage;
+      const data = Eth.createTransactionData(contract, abi, 'set', [number]);
+      const { transaction, payload } = await Eth.createPayload(senderAddress, contract, 0, data);
+      return { transaction, payload };
     },
 
     async afterRelay() {
@@ -132,7 +111,6 @@ FunctionCallForm.propTypes = {
     loading: PropTypes.bool.isRequired,
     Eth: PropTypes.shape({
       createPayload: PropTypes.func.isRequired,
-      createEip712Payload: PropTypes.func.isRequired,
       createTransactionData: PropTypes.func.isRequired,
       getContractViewFunction: PropTypes.func.isRequired,
     }).isRequired,

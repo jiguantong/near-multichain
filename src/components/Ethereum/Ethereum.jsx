@@ -69,17 +69,19 @@ export function EthereumView({ props: { setStatus, MPC_CONTRACT, transactions } 
   async function chainSignature() {
     setStatus('🏗️ Creating transaction');
 
-    const { transaction, payload } = await childRef.current.createPayload();
+    const {digest, toSignMessage} = await childRef.current.createPayload();
     // const { transaction, payload } = await Eth.createPayload(senderAddress, receiver, amount, undefined);
-
+    console.log("> ### verify result: ", Eth.verifySignature(digest, "0x07C635B246BEBEAAD50726089E6F739BF3A61D8506F170FE5664182E93B8B764", "0x7070A2F8B9A74234914B0C455927DEF7F1FE20C61D54D983EB87F8D1279564E9", 28));
+    return;
     setStatus(`🕒 Asking ${MPC_CONTRACT} to sign the transaction, this might take a while`);
     try {
-      const { big_r, s, recovery_id } = await Eth.requestSignatureToMPC(wallet, MPC_CONTRACT, derivationPath, payload, transaction, senderAddress);
-      const signedTransaction = await Eth.reconstructSignature(big_r, s, recovery_id, transaction, senderAddress);
+      const { big_r, s, recovery_id } = await Eth.requestSignatureToMPC(wallet, MPC_CONTRACT, derivationPath, toSignMessage);
+      console.log("> ### big_r, s, recovery_id", big_r, s, recovery_id);
+      // const signedTransaction = await Eth.reconstructSignature(big_r, s, recovery_id);
 
-      setSignedTransaction(signedTransaction);
-      setStatus(`✅ Signed payload ready to be relayed to the Ethereum network`);
-      setStep('relay');
+      // setSignedTransaction(signedTransaction);
+      // setStatus(`✅ Signed payload ready to be relayed to the Ethereum network`);
+      // setStep('relay');
     } catch (e) {
       setStatus(`❌ Error: ${e.message}`);
       setLoading(false);
